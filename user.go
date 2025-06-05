@@ -27,7 +27,7 @@ func NewUser(conn net.Conn) *User {
 // 用户读取消息，并返回
 func (user *User) ListenMessage() {
 	for info := range user.Inbox {
-		fmt.Println("用户收取消息: " + info)
+		//fmt.Println("用户收取消息: " + info)
 		_, err := user.conn.Write([]byte(info + "\r\n"))
 		if err != nil {
 			fmt.Println("写入数据失败: " + err.Error())

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"sync"
@@ -25,8 +26,6 @@ func NewServer(ip string, port int) *Server {
 		OnlineMap: make(map[string]*User),
 		Exchange:  make(chan string),
 	}
-	// 启动监听线程
-	go server.Forward()
 
 	return server
 }
@@ -46,6 +45,32 @@ func (server *Server) Handler(conn net.Conn) {
 	// 用户上线提醒
 	server.BroadCast(user, "online ~ ")
 
+	// 接受客户端发送的消息
+	go func() {
+		buf := make([]byte, 4096)
+		for {
+			n, err := conn.Read(buf)
+			if n == 0 {
+				server.BroadCast(user, "offline ~ ")
+				return
+			}
+			if err != nil && err != io.EOF {
+				fmt.Println("Conn Read err:", err)
+				return
+			}
+			// 提取用户的消息
+			msg := string(buf[:n-1])
+			// 广播消息
+			server.BroadCast(user, msg)
+		}
+	}()
+
+	// 阻塞handler
+	select {
+	// case msg := <-user.Inbox:
+	// 	server.BroadCast(user, msg)
+	}
+
 }
 
 func (server *Server) BroadCast(user *User, msg string) {
@@ -58,7 +83,7 @@ func (server *Server) Forward() {
 	for msg := range server.Exchange {
 		server.mapLock.Lock()
 		for _, v := range server.OnlineMap {
-			fmt.Println("服务端转发消息: " + msg)
+			//fmt.Println("服务端转发消息: " + msg)
 			v.Inbox <- msg
 		}
 		server.mapLock.Unlock()
@@ -74,6 +99,9 @@ func (server *Server) Start() {
 		return
 	}
 	fmt.Println("server: " + server.Ip + ":" + strconv.Itoa(server.Port) + " start success")
+
+	// 启动监听线程
+	go server.Forward()
 
 	// accept
 	for {
