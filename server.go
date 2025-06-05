@@ -25,6 +25,7 @@ func NewServer(ip string, port int) *Server {
 		OnlineMap: make(map[string]*User),
 		Exchange:  make(chan string),
 	}
+	// 启动监听线程
 	go server.Forward()
 
 	return server
@@ -43,17 +44,24 @@ func (server *Server) Handler(conn net.Conn) {
 	server.mapLock.Unlock()
 
 	// 用户上线提醒
-	server.Exchange <- conn.RemoteAddr().String() + " is online ~ "
+	server.BroadCast(user, "online ~ ")
 
 }
 
-// 服务端消息转发
+func (server *Server) BroadCast(user *User, msg string) {
+	msg = "[" + user.Addr + "]" + user.Name + ": " + msg
+	server.Exchange <- msg
+}
+
+// 监听Exchange, 并进行消息转发
 func (server *Server) Forward() {
 	for msg := range server.Exchange {
+		server.mapLock.Lock()
 		for _, v := range server.OnlineMap {
 			fmt.Println("服务端转发消息: " + msg)
 			v.Inbox <- msg
 		}
+		server.mapLock.Unlock()
 	}
 }
 
