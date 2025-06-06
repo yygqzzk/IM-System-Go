@@ -35,15 +35,8 @@ func (server *Server) Handler(conn net.Conn) {
 	// 连接业务
 	fmt.Println("server new connection: " + conn.RemoteAddr().String())
 	// 创建新用户, 并加入到onlineMap中
-	user := NewUser(conn)
-
-	// 通过锁来防止并发问题
-	server.mapLock.Lock()
-	server.OnlineMap[user.Name] = user
-	server.mapLock.Unlock()
-
-	// 用户上线提醒
-	server.BroadCast(user, "online ~ ")
+	user := NewUser(conn, server)
+	user.Online()
 
 	// 接受客户端发送的消息
 	go func() {
@@ -51,7 +44,7 @@ func (server *Server) Handler(conn net.Conn) {
 		for {
 			n, err := conn.Read(buf)
 			if n == 0 {
-				server.BroadCast(user, "offline ~ ")
+				user.Offline()
 				return
 			}
 			if err != nil && err != io.EOF {
@@ -61,7 +54,7 @@ func (server *Server) Handler(conn net.Conn) {
 			// 提取用户的消息
 			msg := string(buf[:n-1])
 			// 广播消息
-			server.BroadCast(user, msg)
+			user.doMessage(msg)
 		}
 	}()
 
