@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"strings"
 )
 
 type User struct {
@@ -48,6 +49,26 @@ func (user *User) doMessage(msg string) {
 			user.SendMsg(onlineMsg)
 		}
 		user.server.mapLock.Unlock()
+	} else if len(msg) > 7 && strings.HasPrefix(msg, "rename|") {
+		// 修改用户名
+		newName := strings.Split(msg, "|")[1]
+
+		// 判断newName是否重复
+		_, exist := user.server.OnlineMap[newName]
+		if exist {
+			info := fmt.Sprintf("%s has been taken \n", newName)
+			user.SendMsg(info)
+		} else {
+			// 修改时需要加锁
+			user.server.mapLock.Lock()
+			delete(user.server.OnlineMap, user.Name)
+			user.Name = newName
+			user.server.OnlineMap[newName] = user
+			user.server.mapLock.Unlock()
+
+			info := fmt.Sprintf("name has been updated: %s \n", newName)
+			user.SendMsg(info)
+		}
 	} else {
 		user.server.BroadCast(user, msg)
 	}
