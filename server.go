@@ -6,6 +6,7 @@ import (
 	"net"
 	"strconv"
 	"sync"
+	"time"
 )
 
 type Server struct {
@@ -38,11 +39,15 @@ func (server *Server) Handler(conn net.Conn) {
 	user := NewUser(conn, server)
 	user.Online()
 
+	// 监听用户活跃的channel
+	isActive := make(chan bool)
+
 	// 接受客户端发送的消息
 	go func() {
 		buf := make([]byte, 4096)
 		for {
 			n, err := conn.Read(buf)
+
 			if n == 0 {
 				user.Offline()
 				return
@@ -55,13 +60,36 @@ func (server *Server) Handler(conn net.Conn) {
 			msg := string(buf[:n-1])
 			// 广播消息
 			user.doMessage(msg)
+
+			// 刷新活跃时间
+			isActive <- true
 		}
 	}()
 
 	// 阻塞handler
-	select {
-	// case msg := <-user.Inbox:
-	// 	server.BroadCast(user, msg)
+	for {
+		select {
+		// 收到true消息时,自动刷新定时器时间
+		case <-isActive:
+		// 配置定时器
+		case <-time.After(time.Minute * 10):
+			// 超时关闭用户连接
+			fmt.Printf("%s timeout, close connection ... \n", conn.RemoteAddr().String())
+
+			// 消息提示
+			user.SendMsg("timeout close connection")
+
+			// 关闭消息channel
+			close(user.Inbox)
+
+			// 关闭连接
+			err := conn.Close()
+			if err != nil {
+				fmt.Println("Close conn err:", err)
+				return
+			}
+			return
+		}
 	}
 
 }
