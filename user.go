@@ -50,6 +50,7 @@ func (user *User) doMessage(msg string) {
 		}
 		user.server.mapLock.Unlock()
 	} else if len(msg) > 7 && strings.HasPrefix(msg, "rename|") {
+		// rename|newName
 		// 修改用户名
 		newName := strings.Split(msg, "|")[1]
 
@@ -69,6 +70,32 @@ func (user *User) doMessage(msg string) {
 			info := fmt.Sprintf("name has been updated: %s \n", newName)
 			user.SendMsg(info)
 		}
+	} else if len(msg) > 4 && strings.HasPrefix(msg, "to|") {
+		// to|name|msg
+		split := strings.Split(msg, "|")
+		toName := split[1]
+		if toName == "" {
+			user.SendMsg("message format wrong, please use format like \"to|name|msg\" ")
+			return
+		}
+		// 查询用户
+		toUser, ok := user.server.OnlineMap[toName]
+		if !ok {
+			info := fmt.Sprintf("%s is not exist \n", toName)
+			user.SendMsg(info)
+			return
+		}
+		// 判断内容是否为空
+		content := split[2]
+		if content == "" {
+			user.SendMsg("msg can't be empty, please try again")
+			return
+		}
+
+		// 发送消息
+		message := "from [" + user.Addr + "]" + user.Name + ": " + content + "\n"
+		toUser.SendMsg(message)
+
 	} else {
 		user.server.BroadCast(user, msg)
 	}
